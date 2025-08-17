@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011"
+     availabilityStartTime="2023-01-01T00:00:01.950Z" id="1"
+     maxSegmentDuration="PT2S" minBufferTime="PT2S"
+     minimumUpdatePeriod="P100Y" type="dynamic"
+     profiles="urn:mpeg:dash:profile:full:2011"
+     publishTime="{{publishTime}}"
+     timeShiftBufferDepth="PT30S">
+    <ServiceDescription id="0">
+        <Scope schemeIdUri="urn:dvb:dash:lowlatency:scope:2019" value="true"/>
+        <Latency max="4000" min="1500" referenceId="0" target="2000"/>
+        <PlaybackRate max="1.04" min="0.96"/>
+    </ServiceDescription>
+    <Period id="p0" start="PT0S">
+        <BaseURL>dash/</BaseURL>
+        <AdaptationSet id="2" contentType="video" mimeType="video/mp4" segmentAlignment="true">
+            <SegmentTemplate duration="20000000"
+                             initialization="$RepresentationID$_init.mp4"
+                             media="$RepresentationID$-$Number$.m4s"
+                             startNumber="1" timescale="10000000"
+                             availabilityTimeComplete="false"
+                             availabilityTimeOffset="1.960"/>
+            <Representation bandwidth="4096000" codecs="avc1.640029"
+                            frameRate="25/1" width="{{width}}"
+                            height="{{height}}"
+                            sar="1:1" id="chan{{stream_index}}"
+                            startWithSAP="1"/>
+        </AdaptationSet>
+    </Period>
+    <UTCTiming schemeIdUri="urn:mpeg:dash:utc:direct:2014" value="{{utc_value}}"/>
+</MPD>

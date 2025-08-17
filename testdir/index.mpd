@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<MPD xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="urn:mpeg:dash:schema:mpd:2011" xsi:schemaLocation="urn:mpeg:DASH:schema:MPD:2011 DASH-MPD.xsd" type="dynamic" minimumUpdatePeriod="PT1.000S" timeShiftBufferDepth="PT6.000S" minBufferTime="PT2.000S" availabilityStartTime="2025-07-20T12:47:32Z" publishTime="2025-07-20T12:47:32Z" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+	<Period start="PT0.000S" id="dash">
+		<AdaptationSet id="1" contentType="video" segmentAlignment="true" bitstreamSwitching="true">
+			<Representation id="0-0origin" mimeType="video/mp4" codecs="avc1.42c028" bandwidth="1280000" width="1920" height="1080" frameRate="30">
+				<SegmentTemplate timescale="1000" availabilityTimeOffset="1.950" initialization="init-stream0-0origin.mp4" media="1753149178-chunk-stream$RepresentationID$-$Number$.mp4" startNumber="0">
+					<SegmentTimeline>
+						<S t="0" d="2000"/>
+					</SegmentTimeline>
+				</SegmentTemplate>
+			</Representation>
+		</AdaptationSet>
+		<AdaptationSet id="0" contentType="audio" segmentAlignment="true" bitstreamSwitching="true">
+			<Representation id="1-0origin" mimeType="audio/mp4" codecs="mp4a.40.2" bandwidth="163840" audioSamplingRate="48000">
+				<AudioChannelConfiguration schemeIdUri="urn:mpeg:dash:23003:3:audio_channel_configuration:2011" value="2"/>
+				<SegmentTemplate timescale="1000" availabilityTimeOffset="1.950" initialization="init-stream1-0origin.mp4" media="1753149178-chunk-stream$RepresentationID$-$Number$.mp4" startNumber="0">
+					<SegmentTimeline>
+						<S t="0" d="2000"/>
+					</SegmentTimeline>
+				</SegmentTemplate>
+			</Representation>
+		</AdaptationSet>
+	</Period>
+</MPD>
