@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" availabilityStartTime="2023-01-01T00:00:02.125Z" id="1"
+     maxSegmentDuration="PT2S" minBufferTime="PT2S"
+     minimumUpdatePeriod="PT2S" type="dynamic"
+     profiles="urn:mpeg:dash:profile:isoff-live:2011,urn:hbbtv:dash:profile:isoff-live:2012"
+     publishTime="2025-08-20T12:20:35Z" timeShiftBufferDepth="PT30S">
+<ServiceDescription id="0">
+    <Scope schemeIdUri="urn:dvb:dash:lowlatency:scope:2019" value="true" />
+    <Latency max="4000" min="1500" referenceId="0" target="2000" />
+    <PlaybackRate max="1.04" min="0.96" />
+</ServiceDescription>
+  <Period id="p0" start="PT0S">
+    <BaseURL>dash/</BaseURL>
+    <AdaptationSet contentType="audio" segmentAlignment="true" lang="eng">
+      <SegmentTemplate media="$RepresentationID$-time_$Time$.m4s" initialization="$RepresentationID$_init.mp4" timescale="10000000" availabilityTimeComplete="false" availabilityTimeOffset="1.96">
+        <SegmentTimeline>
+          <S t="831612060080000" d="20266666"/>
+          <S t="831612080346667" d="19840000"/>
+          <S t="831612100186667" d="20053333" r="1"/>
+          <S t="831612140293333" d="19840000"/>
+          <S t="831612160133333" d="20053333"/>
+          <S t="831612180186667" d="20053333"/>
+          <S t="831612200240000" d="19840000"/>
+          <S t="831612220080000" d="20053333" r="1"/>
+          <S t="831612260186667" d="20053333" r="1"/>
+          <S t="831612300293333" d="19840000"/>
+          <S t="831612320133333" d="20053333"/>
+          <S t="831612340186667" d="20000000"/>
+        </SegmentTimeline>
+      </SegmentTemplate>
+      <Representation bandwidth="147200" codecs="mp4a.40.2" id="147200_mp4a_40_2_2ch_48000Hz_16bits_eng" mimeType="audio/mp4" audioSamplingRate="48000"/>
+    </AdaptationSet>
+    <AdaptationSet contentType="video" segmentAlignment="true" lang="und">
+      <SegmentTemplate media="$RepresentationID$-time_$Time$.m4s" initialization="$RepresentationID$_init.mp4" timescale="10000000" availabilityTimeComplete="false" availabilityTimeOffset="1.96">
+        <SegmentTimeline>
+          <S t="831612040400000" d="20000000" r="13"/>
+          <S t="831612320400000" d="20000000"/>
+        </SegmentTimeline>
+      </SegmentTemplate>
+      <Representation bandwidth="2655600" codecs="avc1.4d4029" id="2655600_avc1_4d0029_1280x720_25_2" mimeType="video/mp4" frameRate="25/2" width="1280" height="720" sar="1:1" startWithSAP="1"/>
+      <Representation bandwidth="1736000" codecs="avc1.4d4029" id="1736000_avc1_4d0029_960x540_25_2" mimeType="video/mp4" frameRate="25/2" width="960" height="540" sar="1:1" startWithSAP="1"/>
+      <Representation bandwidth="1327200" codecs="avc1.4d4029" id="1327200_avc1_4d0029_640x360_25_2" mimeType="video/mp4" frameRate="25/2" width="640" height="360" sar="1:1" startWithSAP="1"/>
+      <Representation bandwidth="676800" codecs="avc1.4d4028" id="676800_avc1_4d0028_640x360_25_2" mimeType="video/mp4" frameRate="25/2" width="640" height="360" sar="1:1" startWithSAP="1"/>
+      <Representation bandwidth="5779200" codecs="avc1.640029" id="5779200_avc1_640029_1280x720_25_1" mimeType="video/mp4" frameRate="25/1" width="1280" height="720" sar="1:1" startWithSAP="1"/>
+      <Representation bandwidth="3735600" codecs="avc1.4d4029" id="3735600_avc1_4d0029_1280x720_25_1" mimeType="video/mp4" frameRate="25/1" width="1280" height="720" sar="1:1" startWithSAP="1"/>
+    </AdaptationSet>
+  </Period>
+  <UTCTiming schemeIdUri="urn:mpeg:dash:utc:direct:2014" value="2025-08-20T12:20:35.807000Z"/>
+</MPD>
+
+
+
+ <S t="{{current_s_t}}"
+                       d="{{current_s_d}}"/>
+                    <S t="{{current_s_t + current_s_d}}"
+                       d="{{gop_len}}0000000"
+                       r="1000000"/>
+
+<S t="834201100080000" d="20053333" r="1"/>
+<S t="834201140186667" d="19840000"/>
+<S t="834201160026667" d="20053333"/>
+<S t="834201180080000" d="20266666"/>
+<S t="834201200346667" d="19840000"/>
+<S t="834201220186667" d="20053333" r="1"/>
+<S t="834201260293333" d="19840000"/>
+<S t="834201280133333" d="20053333"/>
+<S t="834201300186667" d="20053333"/>
+<S t="834201320240000" d="19840000"/>
+<S t="834201340080000" d="20053333" r="1"/>
+<S t="834201380186667" d="20000000"/>

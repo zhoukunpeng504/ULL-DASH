@@ -12,33 +12,18 @@
         <PlaybackRate max="1.04" min="0.96"/>
     </ServiceDescription>
     <Period id="p0" start="PT0S">
-        <BaseURL>/dash/</BaseURL>
-        <AdaptationSet id="2"
-                       contentType="video"
-                       mimeType="video/mp4"
-                       segmentAlignment="true">
-
-            <SegmentTemplate media="$RepresentationID$-$Time$.m4s"
+        <BaseURL>dash/</BaseURL>
+        <AdaptationSet id="2" contentType="video" mimeType="video/mp4" segmentAlignment="true">
+            <SegmentTemplate duration="20000000"
                              initialization="$RepresentationID$_init.mp4"
-                             timescale="10000000"
+                             media="$RepresentationID$-$Number$.m4s"
+                             startNumber="1" timescale="10000000"
                              availabilityTimeComplete="false"
-                             availabilityTimeOffset="1.96">
-                <SegmentTimeline>
-                    <S t="{{current_s_t}}" d="{{current_s_d}}"/>
-                    <S t="{{current_s_t + current_s_d}}"
-                       d="{{gop_len}}0000000"
-                       r="100000"/>
-
-                </SegmentTimeline>
-            </SegmentTemplate>
-
-            <Representation bandwidth="4096000"
-                            codecs="avc1.640029"
-                            frameRate="25/1"
-                            width="{{width}}"
+                             availabilityTimeOffset="1.960"/>
+            <Representation bandwidth="4096000" codecs="avc1.640029"
+                            frameRate="25/1" width="{{width}}"
                             height="{{height}}"
-                            sar="1:1"
-                            id="chan{{stream_index}}-gop{{gop_len}}"
+                            sar="1:1" id="chan{{stream_index}}"
                             startWithSAP="1"/>
         </AdaptationSet>
     </Period>

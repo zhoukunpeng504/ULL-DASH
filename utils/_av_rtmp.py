@@ -8,22 +8,26 @@ __author__ = "zkp"
 
 def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                      redis_url,
-                     process_name, parent_pid):
+                     process_name,
+                     parent_pid):
     import time, redis, os, datetime, psutil, fractions
+    # 保证日志目录存在
+    os.system("mkdir -p /data/dash_streamer")
+    # 打印日志函数
     def print_to_logger(*args):
         "日志函数"
-        file_name = os.path.join("/data/http_rtmp_streamer",
-                                 f"rtmp_recv-{datetime.datetime.now().strftime('%Y%m%d')}.log")
-        now = datetime.datetime.now().isoformat(sep=' ', timespec='milliseconds')
+        file_name = os.path.join("/data/dash_streamer",
+                                 f"rtmp_recv-{datetime.datetime.now().
+                                 strftime('%Y%m%d')}.log")
+        now = datetime.datetime.now().isoformat(sep=' ',
+                                                timespec='milliseconds')
         try:
             msg = " ".join([str(i) for i in args])
             with open(file_name, "a+") as f:
                 f.write(f"[{now}: INFO]:{msg}\n")
         except:
             pass
-
     redis_conn = redis.Redis.from_url(redis_url)
-
     # 开始正常业务处理流程
     import av
     av.logging.set_level(av.logging.CRITICAL)
@@ -33,11 +37,9 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
     import traceback, random, string
     import psutil
     import pickle, json
-    import os
     import struct
     import bitstring
     # from av import bitstream
-
 
     def parse_avcc_hex(data: bytes):
         """
@@ -46,11 +48,10 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
         """
         sps_list = []
         pps_list = []
-
         if len(data) < 7:
             return sps_list, pps_list
-
-        # 跳过前 5 字节：configurationVersion, AVCProfileIndication, profile_compatibility,
+        # 跳过前 5 字节：configurationVersion,
+        # AVCProfileIndication, profile_compatibility,
         # AVCLevelIndication, lengthSizeMinusOne
         sps_count = data[5] & 0x1F
         offset = 6
@@ -60,7 +61,6 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
             sps = data[offset:offset + sps_length]
             sps_list.append(sps)
             offset += sps_length
-
         pps_count = data[offset]
         offset += 1
         for _ in range(pps_count):
@@ -69,12 +69,8 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
             pps = data[offset:offset + pps_length]
             pps_list.append(pps)
             offset += pps_length
-
         return sps_list[0].hex(), pps_list[0].hex()
 
-    trans_gop_size = os.environ.get('GOPSIZE', None) or os.environ.get('GOP_SIZE', None) or '50'
-    trans_gop_size = int(trans_gop_size)
-    # import ctypes
     current_dir = os.path.abspath(os.path.dirname(__file__))
     sys.path.append(current_dir)
     try:
@@ -84,12 +80,11 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
     # 删除老的标识文件
     import setproctitle
     setproctitle.setproctitle(process_name)
-    os.system("mkdir -p /data/http_rtmp_streamer")
     output_kw_params = {"video": {},
                         "audio": {},
                         'nv_hw': None}  # 输出flv核心参数
 
-    #with open(os.path.abspath(os.path.join(current_dir, "..", "config.json")), "r") as f:
+    # FFMPEG 创建 RTMP server参数
     kwargs = {
         "format": "flv",
         "container_options": {
@@ -98,10 +93,10 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
         }
     }
     print_to_logger("kwargs", kwargs)
-    all_codecs = av.codecs_available
-    nv_hw = False
-    output_kw_params['nv_hw'] = nv_hw
-    print_to_logger("nvidia hw codec status", nv_hw)
+    # all_codecs = av.codecs_available
+    # nv_hw = False
+    # output_kw_params['nv_hw'] = nv_hw
+    # print_to_logger("nvidia hw codec status", nv_hw)
     rtmp_url = f'rtmp://0.0.0.0:{rtmp_port}{rtmp_path}'
 
     def get_fraction_obj(time_base:str):
@@ -142,6 +137,7 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
             # _ =
             # need_encode = False
             # h264_codec = None
+            # ###
             def get_profile(codec_context):
                 if not codec_context.profile:
                     if '444p' not in codec_context.pix_fmt:
@@ -239,6 +235,10 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
 
                     if target_packet and target_frame:
                         v_counter += 1
+                        # if v_counter == 1:
+                        #     # 开始， 第一个包。
+                        #
+                        #     pass
                         if target_packet.is_keyframe:
                             late_iframe_counter = v_counter
                         frame_type = target_frame.pict_type
@@ -270,18 +270,29 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                                  'frame_pts': target_packet.pts
                                  }
                             )
-                        # redis_conn.hset(f'{sub_scribe_key}-cache',
-                        #                 str(v_counter % 500),
-                        #                 pickle.dumps({'frame_ndarray': target_frame.to_ndarray(),
-                        #                               'frame_format': target_frame.format.name,
-                        #                               'frame_pts': target_packet.pts})
-                        #                 )
+                        redis_conn.set(f'{stream_index}-cache-counter{v_counter}',
+                                        # str(v_counter % 600),
+                                        send_data,
+                                        ex=100,  # 缓存 保留100秒
+                                        # pickle.dumps({'frame_ndarray': target_frame.to_ndarray(),
+                                        #               'frame_format': target_frame.format.name,
+                                        #               'frame_pts': target_packet.pts})
+                                       )
+                        # 设置当前的v_counter
+                        redis_conn.set(f"chan_{stream_index}_current_v_info",
+                                       json.dumps({"v_counter": v_counter,
+                                                   'time': packet_time}))
 
-                        try:
-                            redis_conn.publish(sub_scribe_key, send_data)
-                        except (Exception, BaseException) as e:
-                            print_to_logger(f"pub to redis {sub_scribe_key} except:", str(e))
-                            print_to_logger(traceback.format_exc())
+                        # time.time() + v_counter *
+                        #
+                        # redis_conn.hset(f'{sub_scribe_key}-cache')
+
+
+                        # try:
+                        #     redis_conn.publish(sub_scribe_key, send_data)
+                        # except (Exception, BaseException) as e:
+                        #     print_to_logger(f"pub to redis {sub_scribe_key} except:", str(e))
+                        #     print_to_logger(traceback.format_exc())
 
 
 

@@ -18,13 +18,14 @@ import datetime
 import redis
 from utils import process_task, _av_rtmp, request_utils, init_mp4
 import re
-from flask import Flask
+from flask import Flask, stream_with_context
 import mimetypes,hashlib,subprocess
 import requests
 import random,sys
 import jinja2
 from flask import Response
 import flask_cors
+import pickle, json
 
 
 #a = datetime.datetime.strptime("2025-08-11T11:23:35.962000Z","%Y-%m-%dT%H:%M:%S.%fZ")
@@ -46,6 +47,10 @@ def print_to_logger(*args):
         pass
     sys.stdout.flush()
 
+
+def gen_session_id():
+    return hashlib.md5((str(random.random()) + str(time.time())).encode()).hexdigest()[:32]
+
 app = Flask(__name__)
 flask_cors.CORS(app)
 
@@ -53,31 +58,79 @@ dict_info = {"0":("1280","720"),
                  "1":("1920","1080"),
                  "2":("2560","1440"),
                  "3":("3840","2160"),}
+TIME_OFFSET_S = 2.5
+
+avail_timestamp = 1672531200.95
+
+GLOBAL_BUFF = {0:{}, 1:{}, 2:{}, 3:{}}
+
+
 
 # 如： /ulldash/0/main.mpd   0 对应720p
-@app.route("/ulldash/<path:stream_index>/main.mpd")
-def mpd_index(stream_index:str):
+@app.route("/ulldash/<int:stream_index>/gop<int:gop_len>/main.mpd")
+def mpd_index(stream_index:int, gop_len:int):
     global dict_info
     request = flask.request
+    redis_conn = redis.Redis.from_url(redis_url)
+
+    current_v_info = redis_conn.get(f"chan_{stream_index}_current_v_info")
+    # current_v_time  = redis_conn.get(f"chan_{stream_index}_current_v_time")
+
+    if not current_v_info:
+        return Response('404 no stream',
+                        content_type="html/text")
+    current_v_info = json.loads(current_v_info)
+    current_v_counter = current_v_info["v_counter"]
+    current_v_time = current_v_info["time"]
+
     with open("./template.mpd", "r") as f:
         template = jinja2.Template(f.read())
-    width, height = dict_info[stream_index]
-    now = datetime.datetime.now()
-    publishTime = now.strftime("%Y-%m-%dT%H:%M:%SZ")  # 2025-08-13T02:02:03Z
+    width, height = dict_info[str(stream_index)]
+
+
+    now = datetime.datetime.now().astimezone(datetime.timezone.utc)
     utc_value = now.strftime("%Y-%m-%dT%H:%M:%S.%fZ") # 2025-08-13T02:02:03.789000Z
-    #print(template)
-    response_content = template.render(width=width, height=height, stream_index=stream_index,
-                                       publishTime=publishTime, utc_value=utc_value)
+    # publishTime = now.strftime("%Y-%m-%dT%H:%M:%SZ")  # 2025-08-13T02:02:03Z
+    # publishTime = (datetime.datetime.fromtimestamp(now.timestamp()
+    #                                               - current_v_counter*0.025
+    #                                               )
+    #                .astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    # (publishTime)
+    segment_size = gop_len * 25
+    current_s_t = int((current_v_time - avail_timestamp) * 10000000)
+    current_s_frames = (segment_size - current_v_counter % segment_size) + 1
+    current_s_d = current_s_frames * 400000
+    GLOBAL_BUFF[stream_index][current_s_t] = (current_v_counter, current_s_frames)
+
+    for i in range(2000):
+        GLOBAL_BUFF[stream_index][current_s_t + current_s_d + segment_size*i*400000] = \
+            (current_v_counter + current_s_frames + segment_size*i,
+             segment_size)
+
+    redis_conn.close()
+    response_content = template.render(width=width,
+                                       height=height,
+                                       stream_index=stream_index,
+                                       #publishTime=publishTime,
+                                       utc_value=utc_value,
+                                       gop_len=gop_len,
+                                       current_s_t=current_s_t,
+                                       current_s_d=current_s_d,
+                                       # session_id=gen_session_id()
+                                       )
     return Response(response_content, content_type="application/dash+xml")
 
 
-@app.route("/chan<int:stream_index>_init.mp4")
-def chan_init(stream_index:int):
-    # 一共4个通道
+@app.route("/dash/chan<int:stream_index>-gop<int:gop_len>_init.mp4")
+def chan_init(stream_index:int, gop_len:int):
+    # stream_index  通道编号。一共4个通道
+    # gop_len  GOP长度。
     # 具体配置如上 dict_info中所示
     # profile 按照HIGH
     # level  按照4.2
     # pps 和 sps 从推流时的写入的内存参数中获取， 如果获取不到，则返回404
+    # ####################################
+    # conn = redis.Redis.from_url(redis_url)
     global dict_info
     assert str(stream_index) in dict_info
     width, height = dict_info[str(stream_index)]
@@ -94,7 +147,76 @@ def chan_init(stream_index:int):
         resp = Response(mp4_bytes, status=200, mimetype='video/mp4')
     resp.headers['Cache-Control'] = 'no-cache'
     resp.headers['Server'] = 'flask'
+    redis_conn.close()
     return resp
+
+
+@app.route("/dash/chan<int:stream_index>-gop<int:gop_len>-<int:time_d>.m4s")
+def chan_m4s(stream_index:int, gop_len:int, time_d:int):
+    # 返回切片mp4文件
+    # #############
+    # 一个segment 返回一个gop长度的大小，既 gop_len * 帧率。
+    # 这里帧率统一认为是25fps
+    global GLOBAL_BUFF
+    redis_conn = redis.Redis.from_url(redis_url)
+    current_v_info = redis_conn.get(f"chan_{stream_index}_current_v_info")
+    if not current_v_info:
+        return Response('',
+                        content_type="video/mp4")
+    current_v_info = json.loads(current_v_info)
+    current_v_counter = current_v_info["v_counter"]
+    current_v_time = current_v_info["time"]
+    # now = datetime.datetime.now()
+    # total_frame_num = gop_len * 25
+    # number_ = time_d
+    print("time_d", time_d)
+    assert time_d in GLOBAL_BUFF[stream_index]
+    req_v_counter, req_frames = GLOBAL_BUFF[stream_index][time_d]
+
+    # all_frame_num = gop_len * 25 - current_v_counter % (gop_len * 25)
+    # t_now = (number_ - 1) * 10000000 * gop_len + TIME_OFFSET_S + \
+    #     datetime.datetime.strptime('2023-01-01T00:00:01.950Z',
+    #                                '%Y-%m-%dT%H:%M:%S.%fZ').timestamp()
+    # print("#####t_now", datetime.datetime.fromtimestamp(t_now), now)
+    # chan_subscribe_key = hashlib.md5(f'/live/chan{stream_index}'\
+    #                                  .encode('utf-8')).hexdigest()[:10]
+    init_obj = init_mp4.AvcMp4()
+
+
+    @stream_with_context
+    def return_fun():
+        for i in range(req_frames):
+            v_counter = req_v_counter + i
+            v_counter_time = time_d + i * 400000
+            data = b''
+            for j in range(30):
+                # 重试30次
+                data = redis_conn.get(f'{stream_index}-cache-counter{v_counter}')
+                if not data:
+                    gevent.sleep(0.1)
+                else:
+                    break
+            if not data:
+                return Response(b'404', status=404, mimetype='video/mp4')
+            else:
+                pass
+            data_obj = pickle.loads(data)
+            data_frame_i = data_obj['i_packet_bytes']
+            data_frame_raw = data_obj['packet_bytes']
+            if i == 0:
+                if req_frames == gop_len * 25:
+                    # 直接返回原始数据
+                    _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
+                                                             data_frame_raw)
+                else:
+                    _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
+                                                             data_frame_i)
+            else:
+                _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
+                                                         data_frame_raw)
+            yield _data
+
+    return Response(return_fun(), mimetype='video/mp4')
 
 
 def process_clean_fun():
@@ -109,6 +231,7 @@ def process_clean_fun():
             except Exception as e:
                 print_to_logger("process clean fun error", str(e))
         time.sleep(2)
+
 
 if __name__ == '__main__':
     dash_port = os.environ.get('DASH_PORT', None) or 8209

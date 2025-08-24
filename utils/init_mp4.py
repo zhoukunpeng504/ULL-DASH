@@ -5,6 +5,7 @@ import random
 import typing
 import copy
 from bitstring import BitArray
+import os, sys
 
 all_mp4_boxes = ['2dqr', '2dss', 'ainf', 'assp', 'auxi', 'avcn', 'bidx', 'bloc', 'bmdm', 'bpcc', 'brob', 'buff',
                  'bxml', 'ccid', 'ccst', 'cdef', 'cinf', 'clip', 'cmap', 'co64', 'coif', 'coin', 'colr', 'covi',
@@ -125,7 +126,9 @@ class AvcMp4(object):
 
     def __init__(self, timescale=10000000):
         self.timescale = timescale
-        with open("avc1_1280x720_25_1_init.mp4", "rb") as f:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(current_dir,
+                               "avc1_1280x720_25_1_init.mp4"), "rb") as f:
             self.template_mp4_bytes = f.read()
         self.template_ftyp = self.template_mp4_bytes[:28]
         self.template_moov_obj = Mp4Box(self.template_mp4_bytes[28:])
