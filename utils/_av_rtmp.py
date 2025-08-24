@@ -101,16 +101,16 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
 
     def get_fraction_obj(time_base:str):
         _a,_b = time_base.split('/')
-        _a,_b = int(_a),int(_b)
-        return fractions.Fraction(_a,_b)
+        _a,_b = int(_a), int(_b)
+        return fractions.Fraction(_a, _b)
 
     while True:
         output_kw_params['video'] = {}
-        output_kw_params['audio'] = {}
+        output_kw_params['audio'] = {}   # audio相关的暂时不处理
         try:
             print_to_logger("av open", rtmp_url)
             input_av = av.open(rtmp_url, 'r',
-                            #metadata_errors='ignore',
+                            # metadata_errors='ignore',
                             # format=format,
                             timeout=None,
                             **kwargs
@@ -118,7 +118,8 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
             print_to_logger("av open ...")
             print_to_logger("input_av flags", input_av.flags)
             video = input_av.streams.video[0]
-            # 获取pps 和 sps数据 写入到redis
+            # 先获取extra_data，然后解析出 pps 和 sps 数据 写入到redis
+            # 便于后续流媒体服务中 init.mp4文件的生成
             video_extradata = video.codec_context.extradata
             video_sps, video_pps = parse_avcc_hex(video_extradata)
             redis_conn.set(f"chan_{stream_index}_pps",
@@ -127,10 +128,13 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                            bitstring.BitArray(hex=video_sps).bytes)
             # ######## end ###############
 
-            #mp4toannexb_filter = bitstream.BitStreamFilterContext("h264_mp4toannexb",
+            # rtmp 中，本来就是 annexb 格式。无需使用filter
+            # mp4toannexb_filter = bitstream.BitStreamFilterContext("h264_mp4toannexb",
             #                                            in_stream=video)
             code_name = video.codec_context.name
-            print_to_logger("video code name is", code_name, video.codec_context.pix_fmt,
+            print_to_logger("video code name is",
+                            code_name,
+                            video.codec_context.pix_fmt,
                             video.codec_context.profile)
             print_to_logger("#######")
             print_to_logger("video sps and pps", video_sps, video_pps)
@@ -161,11 +165,13 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
             output_kw_params['video']['colorspace'] = video.codec_context.colorspace
             output_kw_params['video']['profile'] = get_profile(video.codec_context)
             video_params = output_kw_params['video']
-            h264_codec_w = av.CodecContext.create('h264', "w")
+            h264_codec_w = av.CodecContext.create('h264',
+                                                  "w")
             h264_codec_w.pix_fmt = video.codec_context.pix_fmt
             h264_codec_w.width = video.width
             h264_codec_w.height = video.height
-            h264_codec_w.time_base = get_fraction_obj(output_kw_params['video']['time_base'])  # video_params['time_base']
+            h264_codec_w.time_base = get_fraction_obj(
+                output_kw_params['video']['time_base'])  # video_params['time_base']
             h264_codec_w.options = {"level": '42',
                                     #'Profile': 'High',
                                     'tune': 'zerolatency',
@@ -196,9 +202,6 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
             h264_codec_w.rate = get_fraction_obj(video_params['rate'])
             h264_codec_w.framerate = get_fraction_obj(video_params['rate'])
             print_to_logger("### h264_codec_w is ", h264_codec_w)
-
-
-
             print_to_logger("output_kw_params", output_kw_params)
 
             redis_conn.set(f"{sub_scribe_key}-params", json.dumps(output_kw_params))
@@ -226,7 +229,7 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                     # 视频帧
                     target_packet = None
                     target_frame = None
-                    #if code_name not in ('h265', 'hevc'):
+                    # if code_name not in ('h265', 'hevc'):
                         # 无需转码
                     frames = _p.decode()
                     if frames:
@@ -244,13 +247,13 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                         frame_type = target_frame.pict_type
                         w_packets = h264_codec_w.encode(target_frame)
                         w_i_packet = w_packets[0]
-                        print_to_logger("target_packet_v", target_packet, frame_type,
+                        print_to_logger("target_packet_v",
+                                        target_packet, frame_type,
                                         target_packet.is_keyframe, v_counter,
                                         late_iframe_counter)
 
-                        print_to_logger("w_i_packet_v", w_i_packet,
-                                        w_i_packet.is_keyframe)
-
+                        print_to_logger("w_i_packet_v",
+                                        w_i_packet, w_i_packet.is_keyframe)
                         packet_bytes = bytes(target_packet)
                         # with open("/tmp/h264-packet.h264", "wb+") as packet_file:
                         #     packet_file.write(packet_bytes)
