@@ -8,7 +8,7 @@
      timeShiftBufferDepth="PT30S">
     <ServiceDescription id="0">
         <Scope schemeIdUri="urn:dvb:dash:lowlatency:scope:2019" value="true"/>
-        <Latency max="4000" min="1500" referenceId="0" target="2000"/>
+        <Latency max="2000" min="500" referenceId="0" target="1000"/>
         <PlaybackRate max="1.04" min="0.96"/>
     </ServiceDescription>
     <Period id="p0" start="PT0S">
@@ -26,7 +26,7 @@
                 <SegmentTimeline>
                     <S t="{{current_s_t}}" d="{{current_s_d}}"/>
                     <S t="{{current_s_t + current_s_d}}"
-                       d="{{gop_len}}0000000"
+                       d="{{current_goplen * 400000}}"
                        r="100000"/>
 
                 </SegmentTimeline>
@@ -38,7 +38,7 @@
                             width="{{width}}"
                             height="{{height}}"
                             sar="1:1"
-                            id="chan{{stream_index}}-gop{{gop_len}}"
+                            id="chan{{stream_index}}"
                             startWithSAP="1"/>
         </AdaptationSet>
     </Period>

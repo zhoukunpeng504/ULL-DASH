@@ -67,18 +67,20 @@ GLOBAL_BUFF = {0:{}, 1:{}, 2:{}, 3:{}}
 
 
 # 如： /ulldash/0/main.mpd   0 对应720p
-@app.route("/ulldash/<int:stream_index>/gop<int:gop_len>/main.mpd")
-def mpd_index(stream_index:int, gop_len:int):
+@app.route("/ulldash/<int:stream_index>/main.mpd")
+def mpd_index(stream_index:int):
     global dict_info
     request = flask.request
     redis_conn = redis.Redis.from_url(redis_url)
 
     current_v_info = redis_conn.get(f"chan_{stream_index}_current_v_info")
+    current_goplen = redis_conn.get(f"chan_{stream_index}_current_goplen")
     # current_v_time  = redis_conn.get(f"chan_{stream_index}_current_v_time")
-
-    if not current_v_info:
+    print_to_logger("###### current_goplen", current_goplen)
+    if not current_v_info or not current_goplen:
         return Response('404 no stream',
                         content_type="html/text")
+    current_goplen = int(current_goplen)
     current_v_info = json.loads(current_v_info)
     current_v_counter = current_v_info["v_counter"]
     current_v_time = current_v_info["time"]
@@ -96,7 +98,7 @@ def mpd_index(stream_index:int, gop_len:int):
     #                                               )
     #                .astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     # (publishTime)
-    segment_size = gop_len * 25
+    segment_size = current_goplen # gop_len * 25
     current_s_t = int((current_v_time - avail_timestamp) * 10000000)
     current_s_frames = (segment_size - current_v_counter % segment_size) + 1
     current_s_d = current_s_frames * 400000
@@ -113,7 +115,8 @@ def mpd_index(stream_index:int, gop_len:int):
                                        stream_index=stream_index,
                                        #publishTime=publishTime,
                                        utc_value=utc_value,
-                                       gop_len=gop_len,
+                                       #gop_len=gop_len,
+                                       current_goplen=current_goplen,
                                        current_s_t=current_s_t,
                                        current_s_d=current_s_d,
                                        # session_id=gen_session_id()
@@ -121,8 +124,8 @@ def mpd_index(stream_index:int, gop_len:int):
     return Response(response_content, content_type="application/dash+xml")
 
 
-@app.route("/dash/chan<int:stream_index>-gop<int:gop_len>_init.mp4")
-def chan_init(stream_index:int, gop_len:int):
+@app.route("/dash/chan<int:stream_index>_init.mp4")
+def chan_init(stream_index:int):
     # stream_index  通道编号。一共4个通道
     # gop_len  GOP长度。
     # 具体配置如上 dict_info中所示
@@ -151,8 +154,8 @@ def chan_init(stream_index:int, gop_len:int):
     return resp
 
 
-@app.route("/dash/chan<int:stream_index>-gop<int:gop_len>-<int:time_d>.m4s")
-def chan_m4s(stream_index:int, gop_len:int, time_d:int):
+@app.route("/dash/chan<int:stream_index>-<int:time_d>.m4s")
+def chan_m4s(stream_index:int, time_d:int):
     # 返回切片mp4文件
     # #############
     # 一个segment 返回一个gop长度的大小，既 gop_len * 帧率。
@@ -160,9 +163,11 @@ def chan_m4s(stream_index:int, gop_len:int, time_d:int):
     global GLOBAL_BUFF
     redis_conn = redis.Redis.from_url(redis_url)
     current_v_info = redis_conn.get(f"chan_{stream_index}_current_v_info")
+    current_goplen = redis_conn.get(f"chan_{stream_index}_current_goplen")
     if not current_v_info:
         return Response('',
                         content_type="video/mp4")
+    current_goplen = int(current_goplen)
     current_v_info = json.loads(current_v_info)
     current_v_counter = current_v_info["v_counter"]
     current_v_time = current_v_info["time"]
@@ -204,7 +209,7 @@ def chan_m4s(stream_index:int, gop_len:int, time_d:int):
             data_frame_i = data_obj['i_packet_bytes']
             data_frame_raw = data_obj['packet_bytes']
             if i == 0:
-                if req_frames == gop_len * 25:
+                if req_frames == current_goplen:
                     # 直接返回原始数据
                     _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
                                                              data_frame_raw)

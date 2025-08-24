@@ -17,8 +17,7 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
     def print_to_logger(*args):
         "日志函数"
         file_name = os.path.join("/data/dash_streamer",
-                                 f"rtmp_recv-{datetime.datetime.now().
-                                 strftime('%Y%m%d')}.log")
+                                 f"rtmp_recv-{datetime.datetime.now().strftime('%Y%m%d')}.log")
         now = datetime.datetime.now().isoformat(sep=' ',
                                                 timespec='milliseconds')
         try:
@@ -243,6 +242,11 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                         #
                         #     pass
                         if target_packet.is_keyframe:
+                            # goplen信息 写入redis
+                            if late_iframe_counter >=1:
+                                redis_conn.set(f"chan_{stream_index}_current_goplen",
+                                               str(v_counter-late_iframe_counter))
+                            # ###################
                             late_iframe_counter = v_counter
                         frame_type = target_frame.pict_type
                         w_packets = h264_codec_w.encode(target_frame)
