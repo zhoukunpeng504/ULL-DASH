@@ -70,6 +70,48 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
             offset += pps_length
         return sps_list[0].hex(), pps_list[0].hex()
 
+
+
+    def annexb_to_avcc(annexb_bytes, length_size=4):
+        """
+        将 Annex B 格式的视频流转换为 AVCC 格式
+        annexb_bytes: Annex B 字节流
+        length_size: 长度字段字节数 (常用4)
+        """
+        avcc_bytes = bytearray()
+        pos = 0
+        start_code_prefixes = [b'\x00\x00\x00\x01', b'\x00\x00\x01']
+        nalu_list = []
+
+        while pos < len(annexb_bytes):
+            # 找到起始码
+            if annexb_bytes[pos:pos + 4] == b'\x00\x00\x00\x01':
+                start = pos + 4
+            elif annexb_bytes[pos:pos + 3] == b'\x00\x00\x01':
+                start = pos + 3
+            else:
+                pos += 1
+                continue
+
+            # 找到下一个起始码
+            next_start = None
+            for prefix in start_code_prefixes:
+                idx = annexb_bytes.find(prefix, start)
+                if idx != -1 and (next_start is None or idx < next_start):
+                    next_start = idx
+
+            # 切片 NALU
+            nalu = annexb_bytes[start:next_start] if next_start else annexb_bytes[start:]
+            nalu_list.append(nalu)
+            pos = next_start if next_start else len(annexb_bytes)
+
+        # 重新拼接为 AVCC 格式
+        for nalu in nalu_list:
+            avcc_bytes += struct.pack('>I', len(nalu)) + nalu
+
+        return bytes(avcc_bytes), nalu_list
+
+
     current_dir = os.path.abspath(os.path.dirname(__file__))
     sys.path.append(current_dir)
     try:
@@ -147,6 +189,8 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                         return 'high'
                     else:
                         return 'high444p'
+                if 'baseline' in codec_context.profile.lower():
+                    return 'baseline'
                 return 'high'
 
             output_kw_params['video']['codec'] = 'h264'
@@ -171,7 +215,7 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
             h264_codec_w.height = video.height
             h264_codec_w.time_base = get_fraction_obj(
                 output_kw_params['video']['time_base'])  # video_params['time_base']
-            h264_codec_w.options = {"level": '42',
+            h264_codec_w.options = {"level": '41',
                                     #'Profile': 'High',
                                     'tune': 'zerolatency',
                                     'preset': 'ultrafast',
@@ -181,9 +225,10 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                                     # 'color_range': str(color_range),
                                     # 'color_trc': str(color_trc),
                                     # 'colorspace': str(colorspace),
-                                    'profile': output_kw_params['video']['profile'],  # '3', # str(profile).lower(),
+                                    'profile': 'baseline', # output_kw_params['video']['profile'],  # '3', # str(profile).lower(),
                                     'rc': "vbr",
-                                    'x264-params': 'keyint=1:min-keyint=1'
+                                    'x264-params': 'keyint=1:min-keyint=1:annexb=0', #
+                                    #'annexb': '0'
                                     # 'rgb_mode': "1"
                                     }
             # h264_codec_w.gop_size = 25  # 设置gop 为25
@@ -251,14 +296,21 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                         frame_type = target_frame.pict_type
                         w_packets = h264_codec_w.encode(target_frame)
                         w_i_packet = w_packets[0]
+                        w_i_packet_bytes = bytes(w_i_packet)
+                        #avcc_info = annexb_to_avcc(w_i_packet_bytes)
                         print_to_logger("target_packet_v",
                                         target_packet, frame_type,
                                         target_packet.is_keyframe, v_counter,
                                         late_iframe_counter)
 
-                        print_to_logger("w_i_packet_v",
-                                        w_i_packet, w_i_packet.is_keyframe)
+
                         packet_bytes = bytes(target_packet)
+                        print_to_logger("w_i_packet_v",
+                                        w_i_packet,
+                                        bitstring.BitArray(w_i_packet_bytes)[:32],
+                                        w_i_packet.is_keyframe
+                                        )  #
+
                         # with open("/tmp/h264-packet.h264", "wb+") as packet_file:
                         #     packet_file.write(packet_bytes)
 

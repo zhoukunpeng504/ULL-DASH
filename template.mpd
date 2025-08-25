@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <MPD xmlns="urn:mpeg:dash:schema:mpd:2011"
      availabilityStartTime="2023-01-01T00:00:01.950Z" id="1"
-     maxSegmentDuration="PT2S" minBufferTime="PT2S"
-     minimumUpdatePeriod="P100Y" type="dynamic"
+     maxSegmentDuration="PT2S"
+     minBufferTime="PT2S"
+     minimumUpdatePeriod="P100Y"
+     type="dynamic"
      profiles="urn:mpeg:dash:profile:full:2011"
      publishTime="{{publishTime}}"
      timeShiftBufferDepth="PT30S">

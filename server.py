@@ -208,17 +208,27 @@ def chan_m4s(stream_index:int, time_d:int):
             data_obj = pickle.loads(data)
             data_frame_i = data_obj['i_packet_bytes']
             data_frame_raw = data_obj['packet_bytes']
-            if i == 0:
-                if req_frames == current_goplen:
-                    # 直接返回原始数据
-                    _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
-                                                             data_frame_raw)
-                else:
-                    _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
+            # # 采用所有i帧
+            if req_frames != current_goplen:
+                _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
                                                              data_frame_i)
             else:
                 _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
                                                          data_frame_raw)
+
+            # # 只采用第一个I帧
+            # if i == 0:
+            #     if req_frames == current_goplen:
+            #         # 直接返回原始数据
+            #         _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
+            #                                                  data_frame_raw)
+            #     else:
+            #         _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
+            #                                                  data_frame_i)
+            # else:
+            #     _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
+            #                                              data_frame_raw)
+
             yield _data
 
     return Response(return_fun(), mimetype='video/mp4')
