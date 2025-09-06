@@ -84,6 +84,34 @@ def mpd_index(stream_index:int):
     current_v_info = json.loads(current_v_info)
     current_v_counter = current_v_info["v_counter"]
     current_v_time = current_v_info["time"]
+    current_is_key = current_v_info["is_key"]
+
+    ### 对 current_v_counter 进行处理
+    if not current_is_key:
+        # if current_v_counter % current_goplen <=5:
+        #    current_v_counter = (current_v_counter // current_goplen) * current_goplen + 1
+        # 假设current_goplen为25
+        # v_counter 为1时， v_counter无需处理 为 1
+        # v_counter 为2时， v_counter经过处理后 为 1
+        # v_counter 为3时， v_counter经过处理后 为 1
+        # v_counter 为6时， v_counter经过处理后 为 6
+        # v_counter 为7时， v_counter经过处理后 为 6
+        # v_counter 为11时， v_counter经过处理后 为 11
+        # v_counter 为12时， v_counter经过处理后 为 11
+        # v_counter 为17时， v_counter经过处理后 为 16
+        # v_counter 为21时， v_counter经过处理后 为 21
+        # v_counter 为26时， v_counter无需处理，为26
+        # v_counter 为27时， v_counter经过处理后，为26
+        # v_counter 为29时， v_counter经过处理后，为26
+        # v_counter 为30时， v_counter经过处理后，为26
+        if 5 >= ((current_v_counter % current_goplen) % 10) >= 1 :
+            current_v_counter = current_v_counter //10 * 10 + 1
+        else:
+            current_v_counter = current_v_counter // 10 * 10 + 6
+        _data = redis_conn.get(f'{stream_index}-cache-counter{current_v_counter}')
+        current_v_info = pickle.loads(_data)
+        current_v_time = current_v_info["time"]
+        current_is_key = current_v_info["is_key"] #
 
     with open("./template.mpd", "r") as f:
         template = jinja2.Template(f.read())
@@ -98,7 +126,8 @@ def mpd_index(stream_index:int):
     #                                               )
     #                .astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
     # (publishTime)
-    segment_size = current_goplen # gop_len * 25
+
+    segment_size = current_goplen        # gop_len * 25
     current_s_t = int((current_v_time - avail_timestamp) * 10000000)
     current_s_frames = (segment_size - current_v_counter % segment_size) + 1
     current_s_d = current_s_frames * 400000
@@ -216,7 +245,7 @@ def chan_m4s(stream_index:int, time_d:int):
                 _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
                                                          data_frame_raw)
 
-            # # 只采用第一个I帧
+            # 只采用第一个I帧
             # if i == 0:
             #     if req_frames == current_goplen:
             #         # 直接返回原始数据

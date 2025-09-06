@@ -227,7 +227,7 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                                     # 'colorspace': str(colorspace),
                                     'profile': 'baseline', # output_kw_params['video']['profile'],  # '3', # str(profile).lower(),
                                     'rc': "vbr",
-                                    'x264-params': 'keyint=1:min-keyint=1:annexb=0', #
+                                    'x264-params': 'keyint=5:min-keyint=5:annexb=0', #
                                     #'annexb': '0'
                                     # 'rgb_mode': "1"
                                     }
@@ -340,7 +340,8 @@ def av_recv_function(stream_index, rtmp_port, rtmp_path, sub_scribe_key,
                         # 设置当前的v_counter
                         redis_conn.set(f"chan_{stream_index}_current_v_info",
                                        json.dumps({"v_counter": v_counter,
-                                                   'time': packet_time}))
+                                                   'time': packet_time,
+                                                   "is_key": target_packet.is_keyframe}))
 
                         # time.time() + v_counter *
                         #
