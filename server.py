@@ -60,17 +60,25 @@ dict_info = {"0":("1280","720"),
                  "3":("3840","2160"),}
 TIME_OFFSET_S = 2.5
 
-avail_timestamp = 1672531200.95
+avail_timestamp = 1672531201.95
 
 GLOBAL_BUFF = {0:{}, 1:{}, 2:{}, 3:{}}
 
 
 
 # 如： /ulldash/0/main.mpd   0 对应720p
+
+# @app.route("/lldash/<int:stream_index>/main.mpd")
+@app.route("/lldash/<int:stream_index>/main.mpd")
 @app.route("/ulldash/<int:stream_index>/main.mpd")
 def mpd_index(stream_index:int):
     global dict_info
     request = flask.request
+    path = request.path
+    if 'ulldash' in path:
+        ull_mode = True
+    else:
+        ull_mode = False
     redis_conn = redis.Redis.from_url(redis_url)
 
     current_v_info = redis_conn.get(f"chan_{stream_index}_current_v_info")
@@ -87,51 +95,59 @@ def mpd_index(stream_index:int):
     current_is_key = current_v_info["is_key"]
 
     ### 对 current_v_counter 进行处理
-    if not current_is_key:
-        # if current_v_counter % current_goplen <=5:
-        #    current_v_counter = (current_v_counter // current_goplen) * current_goplen + 1
-        # 假设current_goplen为25
-        # v_counter 为1时， v_counter无需处理 为 1
-        # v_counter 为2时， v_counter经过处理后 为 1
-        # v_counter 为3时， v_counter经过处理后 为 1
-        # v_counter 为6时， v_counter经过处理后 为 6
-        # v_counter 为7时， v_counter经过处理后 为 6
-        # v_counter 为11时， v_counter经过处理后 为 11
-        # v_counter 为12时， v_counter经过处理后 为 11
-        # v_counter 为17时， v_counter经过处理后 为 16
-        # v_counter 为21时， v_counter经过处理后 为 21
-        # v_counter 为26时， v_counter无需处理，为26
-        # v_counter 为27时， v_counter经过处理后，为26
-        # v_counter 为29时， v_counter经过处理后，为26
-        # v_counter 为30时， v_counter经过处理后，为26
-        if 5 >= ((current_v_counter % current_goplen) % 10) >= 1 :
-            current_v_counter = current_v_counter //10 * 10 + 1
-        else:
-            current_v_counter = current_v_counter // 10 * 10 + 6
-        _data = redis_conn.get(f'{stream_index}-cache-counter{current_v_counter}')
-        current_v_info = pickle.loads(_data)
-        current_v_time = current_v_info["time"]
-        current_is_key = current_v_info["is_key"] #
+    if ull_mode:
+        if not current_is_key:
+            # if current_v_counter % current_goplen <=5:
+            #    current_v_counter = (current_v_counter // current_goplen) * current_goplen + 1
+            # 假设current_goplen为25
+            # v_counter 为1时， v_counter无需处理 为 1
+            # v_counter 为2时， v_counter经过处理后 为 1
+            # v_counter 为3时， v_counter经过处理后 为 1
+            # v_counter 为6时， v_counter经过处理后 为 6
+            # v_counter 为7时， v_counter经过处理后 为 6
+            # v_counter 为11时， v_counter经过处理后 为 11
+            # v_counter 为12时， v_counter经过处理后 为 11
+            # v_counter 为17时， v_counter经过处理后 为 16
+            # v_counter 为21时， v_counter经过处理后 为 21
+            # v_counter 为26时， v_counter无需处理，为26
+            # v_counter 为27时， v_counter经过处理后，为26
+            # v_counter 为29时， v_counter经过处理后，为26
+            # v_counter 为30时， v_counter经过处理后，为26
+            if 5 >= ((current_v_counter % current_goplen) % 10) >= 1 :
+                current_v_counter = current_v_counter //10 * 10 + 1
+            else:
+                current_v_counter = current_v_counter // 10 * 10 + 6
+            _data = redis_conn.get(f'{stream_index}-cache-counter{current_v_counter}')
+            current_v_info = pickle.loads(_data)
+            current_v_time = current_v_info["time"]
+            current_is_key = current_v_info["is_key"] #
+    else:
+        if not current_is_key:
+            # if (current_v_counter % current_goplen)
+            current_v_counter = current_v_counter // current_goplen * current_goplen + 1
+            _data = redis_conn.get(f'{stream_index}-cache-counter{current_v_counter}')
+            current_v_info = pickle.loads(_data)
+            current_v_time = current_v_info["time"]
+            current_is_key = current_v_info["is_key"]  #
+
 
     with open("./template.mpd", "r") as f:
         template = jinja2.Template(f.read())
     width, height = dict_info[str(stream_index)]
-
+    #
 
     now = datetime.datetime.now().astimezone(datetime.timezone.utc)
-    utc_value = now.strftime("%Y-%m-%dT%H:%M:%S.%fZ") # 2025-08-13T02:02:03.789000Z
-    # publishTime = now.strftime("%Y-%m-%dT%H:%M:%SZ")  # 2025-08-13T02:02:03Z
-    # publishTime = (datetime.datetime.fromtimestamp(now.timestamp()
-    #                                               - current_v_counter*0.025
-    #                                               )
-    #                .astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
-    # (publishTime)
-
+    utc_value = now.strftime("%Y-%m-%dT%H:%M:%S.%fZ")[:-4]+'Z' # 2025-08-13T02:02:03.789000Z
+    publishTime = (datetime.datetime.fromtimestamp(current_v_time)
+                   .astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"))
+    print("###current v_counter", current_v_counter)
     segment_size = current_goplen        # gop_len * 25
     current_s_t = int((current_v_time - avail_timestamp) * 10000000)
     current_s_frames = (segment_size - current_v_counter % segment_size) + 1
     current_s_d = current_s_frames * 400000
-    GLOBAL_BUFF[stream_index][current_s_t] = (current_v_counter, current_s_frames)
+    GLOBAL_BUFF[stream_index][current_s_t] = (current_v_counter,
+                                              current_s_frames +
+                                              (current_goplen if current_s_frames<current_goplen else 0))
 
     for i in range(2000):
         GLOBAL_BUFF[stream_index][current_s_t + current_s_d + segment_size*i*400000] = \
@@ -142,12 +158,14 @@ def mpd_index(stream_index:int):
     response_content = template.render(width=width,
                                        height=height,
                                        stream_index=stream_index,
-                                       #publishTime=publishTime,
+                                       publishTime=publishTime,
                                        utc_value=utc_value,
                                        #gop_len=gop_len,
                                        current_goplen=current_goplen,
                                        current_s_t=current_s_t,
-                                       current_s_d=current_s_d,
+                                       current_s_d=
+                                       (current_s_frames +
+                                       (current_goplen if current_s_frames < current_goplen else 0)) * 400000                                       ,
                                        # session_id=gen_session_id()
                                        )
     return Response(response_content, content_type="application/dash+xml")
@@ -206,6 +224,7 @@ def chan_m4s(stream_index:int, time_d:int):
     print("time_d", time_d)
     assert time_d in GLOBAL_BUFF[stream_index]
     req_v_counter, req_frames = GLOBAL_BUFF[stream_index][time_d]
+    print("req_v_counter req_frames", req_v_counter, req_frames)
 
     # all_frame_num = gop_len * 25 - current_v_counter % (gop_len * 25)
     # t_now = (number_ - 1) * 10000000 * gop_len + TIME_OFFSET_S + \
@@ -219,7 +238,8 @@ def chan_m4s(stream_index:int, time_d:int):
 
     @stream_with_context
     def return_fun():
-        for i in range(req_frames):
+        v_counter = None
+        for i in range(req_frames % current_goplen):
             v_counter = req_v_counter + i
             v_counter_time = time_d + i * 400000
             data = b''
@@ -244,7 +264,30 @@ def chan_m4s(stream_index:int, time_d:int):
             else:
                 _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
                                                          data_frame_raw)
+            yield _data
 
+        if not v_counter:
+           v_counter = req_v_counter - 1
+           v_counter_time = time_d - 400000
+        # ## ADD AT 2025-9-13 BY ZHOU
+        if req_frames >= current_goplen:
+            for i in range(1, current_goplen+1):
+                v_counter = v_counter + 1
+                v_counter_time = v_counter_time + 1 * 400000
+                #print(f"###  v_counter", v_counter, v_counter_time)
+                for j in range(30):
+                    # 重试30次
+                    data = redis_conn.get(f'{stream_index}-cache-counter{v_counter}')
+                    if not data:
+                        gevent.sleep(0.1)
+                    else:
+                        break
+                data_obj = pickle.loads(data)
+                data_frame_raw = data_obj['packet_bytes']
+                # # 采用所有i帧
+                _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
+                                                             data_frame_raw)
+                yield _data
             # 只采用第一个I帧
             # if i == 0:
             #     if req_frames == current_goplen:
@@ -257,9 +300,6 @@ def chan_m4s(stream_index:int, time_d:int):
             # else:
             #     _data = init_obj.get_moof_mdat_free_data(v_counter, v_counter_time,
             #                                              data_frame_raw)
-
-            yield _data
-
     return Response(return_fun(), mimetype='video/mp4')
 
 

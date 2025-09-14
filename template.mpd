@@ -1,16 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <MPD xmlns="urn:mpeg:dash:schema:mpd:2011"
      availabilityStartTime="2023-01-01T00:00:01.950Z" id="1"
-     maxSegmentDuration="PT2S"
-     minBufferTime="PT2S"
+     maxSegmentDuration="PT20S"
+     minBufferTime="PT0.2S"
      minimumUpdatePeriod="P100Y"
      type="dynamic"
      profiles="urn:mpeg:dash:profile:full:2011"
      publishTime="{{publishTime}}"
      timeShiftBufferDepth="PT30S">
+    <UTCTiming schemeIdUri="urn:mpeg:dash:utc:direct:2014" value="{{utc_value}}"/>
+
     <ServiceDescription id="0">
         <Scope schemeIdUri="urn:dvb:dash:lowlatency:scope:2019" value="true"/>
-        <Latency max="2000" min="500" referenceId="0" target="1000"/>
+        <Latency max="20000" min="100" referenceId="0" target="200"/>
         <PlaybackRate max="1.04" min="0.96"/>
     </ServiceDescription>
     <Period id="p0" start="PT0S">
@@ -24,7 +26,8 @@
                              initialization="$RepresentationID$_init.mp4"
                              timescale="10000000"
                              availabilityTimeComplete="false"
-                             availabilityTimeOffset="1.96">
+                             availabilityTimeOffset="{{current_s_d/10000000 - 0.4}}">
+
                 <SegmentTimeline>
                     <S t="{{current_s_t}}" d="{{current_s_d}}"/>
                     <S t="{{current_s_t + current_s_d}}"
@@ -44,5 +47,5 @@
                             startWithSAP="1"/>
         </AdaptationSet>
     </Period>
-    <UTCTiming schemeIdUri="urn:mpeg:dash:utc:direct:2014" value="{{utc_value}}"/>
+
 </MPD>
