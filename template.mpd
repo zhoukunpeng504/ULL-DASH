@@ -2,7 +2,7 @@
 <MPD xmlns="urn:mpeg:dash:schema:mpd:2011"
      availabilityStartTime="2023-01-01T00:00:01.950Z" id="1"
      maxSegmentDuration="PT20S"
-     minBufferTime="PT0.2S"
+     minBufferTime="PT2S"
      minimumUpdatePeriod="P100Y"
      type="dynamic"
      profiles="urn:mpeg:dash:profile:full:2011"
@@ -26,7 +26,7 @@
                              initialization="$RepresentationID$_init.mp4"
                              timescale="10000000"
                              availabilityTimeComplete="false"
-                             availabilityTimeOffset="{{current_s_d/10000000 - 0.4}}">
+                             availabilityTimeOffset="{{current_s_d/10000000 - 0.2}}">
 
                 <SegmentTimeline>
                     <S t="{{current_s_t}}" d="{{current_s_d}}"/>
