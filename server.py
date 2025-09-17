@@ -93,7 +93,7 @@ def mpd_index(stream_index:int):
     current_v_counter = current_v_info["v_counter"]
     current_v_time = current_v_info["time"]
     current_is_key = current_v_info["is_key"]
-
+    print("current_v_counter#1", current_v_counter, current_goplen)
     ### 对 current_v_counter 进行处理
     if ull_mode:
         if not current_is_key:
@@ -105,18 +105,24 @@ def mpd_index(stream_index:int):
             # v_counter 为3时， v_counter经过处理后 为 1
             # v_counter 为6时， v_counter经过处理后 为 6
             # v_counter 为7时， v_counter经过处理后 为 6
+            # v_counter 为10时， v_counter经过处理后 为 6
             # v_counter 为11时， v_counter经过处理后 为 11
             # v_counter 为12时， v_counter经过处理后 为 11
             # v_counter 为17时， v_counter经过处理后 为 16
+            # v_counter 为20时， v_counter经过处理后 为 16
             # v_counter 为21时， v_counter经过处理后 为 21
             # v_counter 为26时， v_counter无需处理，为26
             # v_counter 为27时， v_counter经过处理后，为26
             # v_counter 为29时， v_counter经过处理后，为26
             # v_counter 为30时， v_counter经过处理后，为26
-            if 5 >= ((current_v_counter % current_goplen) % 10) >= 1 :
-                current_v_counter = current_v_counter //10 * 10 + 1
-            else:
-                current_v_counter = current_v_counter // 10 * 10 + 6
+            if ((current_v_counter) % 10) == 0:
+                current_v_counter = current_v_counter - 4
+            elif 5 >= ((current_v_counter) % 10) >= 1:
+                current_v_counter = current_v_counter//10 * 10 + 1
+            elif 9 >= ((current_v_counter) % 10) >= 6:
+                current_v_counter = current_v_counter//10 * 10 + 6
+
+            print("current_v_counter#2", current_v_counter) #
             _data = redis_conn.get(f'{stream_index}-cache-counter{current_v_counter}')
             current_v_info = pickle.loads(_data)
             current_v_time = current_v_info["time"]
